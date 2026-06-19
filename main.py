@@ -1,11 +1,18 @@
 from dotenv import load_dotenv
 from anthropic import Anthropic
-import sys
 import json
+import argparse
 
-#sys.argv:  Son los argumentos al lanzar el código
+#sys.argv:  Son los argumentos al lanzar el código -> Lo hacemos con argparse, es mejor.
 
-with open(sys.argv[1], encoding="utf-8") as f:
+parser = argparse.ArgumentParser(description='Recibe un texto y devuelve un resumen estructurado llamando a un LLM por API')
+
+parser.add_argument("archivo", help='La ruta al archivo que se desea resumir')
+
+args = parser.parse_args()
+
+
+with open(args.archivo, encoding="utf-8") as f:
     contenido = f.read()
 # aquí fuera del bloque, el archivo ya está cerrado
 #print(len(contenido))
