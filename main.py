@@ -1,7 +1,8 @@
 from dotenv import load_dotenv
-from anthropic import Anthropic
+from anthropic import Anthropic, APIError
 import json
 import argparse
+import sys
 
 #sys.argv:  Son los argumentos al lanzar el código -> Lo hacemos con argparse, es mejor.
 
@@ -11,11 +12,13 @@ parser.add_argument("archivo", help='La ruta al archivo que se desea resumir')
 
 args = parser.parse_args()
 
-
-with open(args.archivo, encoding="utf-8") as f:
-    contenido = f.read()
+try:
+    with open(args.archivo, encoding="utf-8") as f:
+        contenido = f.read()
+except FileNotFoundError:
+    print("No se ha podido encontrar el archivo")
+    sys.exit(1)
 # aquí fuera del bloque, el archivo ya está cerrado
-#print(len(contenido))
 
 
 # LLAMADA A API CON HOLA MUNDO:
@@ -32,20 +35,26 @@ prompt = "Resume el siguiente texto y devuelve tu respuesta únicamente como un 
 
 messages = [{"role": "user", "content": f"{prompt}\n\n{contenido}"}]
 
-response = client.messages.create(model=model,max_tokens=max_tokens,messages=messages)
+try:
+    response = client.messages.create(model=model,max_tokens=max_tokens,messages=messages)
+except APIError as e:
+    print(f"Fallo en la llamada a la API: {e}")
+    sys.exit(1)
 
 # Convertimos a texto la respuesta:
 
 text = response.content[0].text
 
 # Primero hay que parsear el JSON
+try:
+    left_index = text.find("{")
+    right_index = text.rfind("}")
+    json_text = text[left_index:right_index+1]
+    resumen = json.loads(json_text)
 
-left_index = text.find("{")
-right_index = text.rfind("}")
-
-json_text = text[left_index:right_index+1]
-
-resumen = json.loads(json_text)
+except json.JSONDecodeError as e: 
+    print(f"Error en el parseo a JSON: {e}")
+    sys.exit(1)
 
 # Los campos demandados son "titulo" "puntos_clave" "conclusion"
 
