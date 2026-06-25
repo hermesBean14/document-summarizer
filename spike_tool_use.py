@@ -7,6 +7,12 @@ def count_words(text):
     return len(text.split())
 
 
+## Diccionario de herramientas disponibles
+available = {
+    "count_words": count_words, ## Mapeo del nombre de la función en caso de usar varias tools.
+}
+
+
 load_dotenv()
 
 client = Anthropic()
@@ -40,35 +46,44 @@ messages = [{"role": "user", "content": f"{prompt}"}]
 
 response = client.messages.create(max_tokens=max_tokens,model=model,tools=[count_words_tool],messages=messages)
 
-n_words = count_words(response.content[0].input["text"])
+## MONTAMOS EL WHILE DESPUES DE LA PRIMERA LLAMADA.
 
-##Segunda llamada a la API
+counter = 0 #Inicializamos el contador
 
-tool_result = {
-    "type": "tool_result",
-    "tool_use_id": response.content[0].id,
-    "content": str(n_words)
-}
+while response.stop_reason == "tool_use" and counter < 5:
 
-messages_final = [{
+    ## Asumo un único tool_use por turno; generalizar a varios cuando toque
 
-        "role": "user",
-        "content": f"{prompt}"
-    },
-    {
-        "role": "assistant",
-        "content": response.content
-    },
-    {
-        "role": "user",
-        "content": [tool_result]
+    block = response.content[0]
+    function = available[block.name]
+    result = function(**block.input)
+   
+    ## Usando el dict para usar la herramienta correspondiente
+
+    tool_result = {
+        "type": "tool_result",
+        "tool_use_id": block.id,
+        "content": str(result)
     }
-]
 
-response2 = client.messages.create(max_tokens=max_tokens,model=model,tools=[count_words_tool],messages=messages_final)
+    ## Actualizar os messages
 
-#print(n_words)
+    messages.append({"role": "assistant", "content": response.content})
+    messages.append({  "role": "user", "content": [tool_result]}) #Habría que añadir aquí algo en content, sería un nuevo append?
 
-#print("\n")
+    ## Llamar de nuevo a la función create
 
-print(response2.content[0].text)
+    response = client.messages.create(max_tokens=max_tokens,model=model,tools=[count_words_tool],messages=messages)
+
+    counter += 1 #Actualizamos el counter al final de cada iteración
+
+
+if response.stop_reason == "tool_use":
+
+    print("Incomplete, not finished, reached iteration limit")
+
+else:
+
+    print(response.content[0].text)
+
+
